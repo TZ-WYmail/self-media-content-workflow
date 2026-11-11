@@ -1,10 +1,10 @@
-# Self Media Skills
+# 自媒体内容工作流（Self Media Skills）
 
-[![CI](https://github.com/yanhua1010/self-media-content-workflow/actions/workflows/validate.yml/badge.svg)](https://github.com/yanhua1010/self-media-content-workflow/actions/workflows/validate.yml)
+[![CI](https://github.com/TZ-WYmail/self-media-content-workflow/actions/workflows/validate.yml/badge.svg)](https://github.com/TZ-WYmail/self-media-content-workflow/actions/workflows/validate.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.1.0-informational)](CHANGELOG.md)
 
-[English](README.md) | **简体中文**
+**简体中文** | [English](README.en.md)
 
 一套通用、模块化的自媒体内容生产与经营 Agent Skills：从模糊需求到创作简报、账号策略、热点与竞品研究、平台原生文案、短视频方案、数字人与动画解说视频制片、YouTube 与抖音视频号小红书多平台视频发布、公众号排版发布、数据复盘和交付归档，覆盖内容生产的完整闭环。
 
@@ -15,6 +15,34 @@
 - **视觉体系化** — 内置 8 套配图风格预设与平台路由，先选风格再出图，同组不混用，账号偏好优先于预设默认值
 
 数字人制片中，头像与声音素材由用户在了解所选服务商当前数据处理条款后，亲自在该平台上传、创建并选定。任务文件、注册表和仓库不保存原始头像或录音、其本机路径、临时链接及平台私有标识，只索引数字人生成片段、最终视频、字幕文件等交付物的路径。
+
+## 先了解：Skills 与工作台有什么区别？
+
+本仓库包含两部分，可以根据需要分别使用：
+
+| 部分 | 入口 | 用途 |
+|---|---|---|
+| 自媒体 Skills | [`skills/`](skills/) | 为 AI 编码助手提供创作、研究、发布与复盘的流程规范 |
+| 本地内容工作台 | [`apps/workbench/`](apps/workbench/README.md) | 用网页管理账号、热点、选题、内容、审核、排期和数据 |
+
+Skills 由你使用的 Agent 执行；工作台负责保存业务状态、展示数据和执行已确认的操作。工作台本身不内置大模型对话或视频生成引擎。
+
+如果你想阅读热点追踪、AIsa 接口和发布管理的具体说明，请先看[工作台中文指南](apps/workbench/README.md)。
+
+### 启动本地工作台
+
+需要 Node.js 22.13 或更高版本，以及预先配置在本机进程环境中的 `AISA_API_KEY`。当前版本启动时就会检查该变量，未配置会退出。工作台没有第三方 npm 运行依赖，无需先执行 `npm install`。
+
+在仓库根目录运行：
+
+```bash
+cd apps/workbench
+npm start
+```
+
+然后访问 <http://127.0.0.1:4318>。账号连接、雷达检索、数据获取和发布功能是否可用，取决于服务权限、账号授权和接口状态；部分调用会产生费用。
+
+工作台当前发布入口为 YouTube、可选随视频同发 X，以及微信公众号草稿箱。Skills 中描述的其他平台发布流程，不代表工作台界面已实现全部平台。
 
 ## 架构
 
@@ -47,13 +75,15 @@ graph TD
 
 视频发布可选用 [SAU 适配器](skills/self-media-video-publisher/references/sau-adapter.md)和无依赖的 `publish.mjs` 先预览逐平台上传计划。
 
-热点雷达的[海外对照模式](skills/self-media-trend-radar/references/overseas-compare.md)用无依赖的 Python 脚本，对比同一话题在 X、YouTube、Reddit 与小红书、抖音、B站的近期互动热度，找出两侧冷热差明显的选题。数据通过 [AIsa](https://go.aisa.one/yanhua) 的 REST API 获取，一个 API key 覆盖 6 个平台，每个话题单次约 $0.03，运行前先报价。
+热点雷达的[海外对照模式](skills/self-media-trend-radar/references/overseas-compare.md)用无依赖的 Python 脚本，对比同一话题在 X、YouTube、Reddit 与小红书、抖音、B站的近期互动热度，找出两侧冷热差明显的选题。数据通过 [AIsa](https://go.aisa.one/yanhua) 的 REST API 获取，一个 API key 覆盖 6 个平台，实际费用以运行前的报价及服务商当前计费为准。
 
 > 披露：上面的 AIsa 链接为推荐链接，通过该链接注册并付费，作者会获得佣金，你的价格不变。
 
 ## 快速开始
 
 ### 安装
+
+以下安装命令使用原作者的上游仓库 `yanhua1010/self-media-content-workflow`；当前仓库为 `TZ-WYmail/self-media-content-workflow`。
 
 **Claude Code 用户（推荐，无需 Node.js）**
 
@@ -151,6 +181,7 @@ skills/                   # 10 个可独立安装的 Skill
 ├── <skill>/references/   #   平台细则与详细规范
 ├── <skill>/assets/       #   可复制的输出模板
 └── <skill>/scripts/      #   可选脚本（视频发布、海外对照）
+apps/workbench/           # 本地内容工作台：网页、HTTP API、CLI、SQLite
 scripts/validate.py       # 仓库结构校验
 .claude-plugin/           # Claude Code plugin 与 marketplace 清单
 .github/workflows/        # 结构校验 + 安装测试

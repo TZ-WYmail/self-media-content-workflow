@@ -1,44 +1,148 @@
-# Self-media workbench
+# 自媒体内容工作台
 
-A local operations workbench for the skill suite: radar, topics, content review, scheduling, publishing and analytics in one place. The agent does the thinking work through the skills; the workbench holds the state and the human approval gate.
+这是自媒体 Skills 套件配套的本地运营工作台，用于集中管理账号、热点研究、选题、内容、人工审核、发布排期和数据复盘。
 
-Seven pages: accounts, radar, topics, content, review, schedule, data. `npm start` and open http://127.0.0.1:4318.
+AI 通过 Skills 完成研究、写作等工作；工作台保存业务状态，并提供网页和 CLI 两种操作入口。它不内置大模型聊天、图片生成或视频制作引擎，可以接收其他工具制作好的文章、视频及其本机路径。
 
-## Channels
+## 页面与功能
 
-| Channel | Platforms | What it does |
+| 页面 | 具体用途 |
+|---|---|
+| 总览 | 汇总账号、选题、内容审核和发布情况 |
+| 账号 | 连接社交账号、查看账号健康状态及微信公众号工具配置 |
+| 雷达 | 按中英文关键词检索公开内容，先报价，再按预算扫描 |
+| 选题 | 将雷达结果及证据保存为选题，标记选定或放弃 |
+| 内容 | 编辑公众号 Markdown 文章、YouTube 视频信息和可选 X 同发文案 |
+| 审核 | 人工批准或退回；修改已批准内容后，需要重新送审 |
+| 排期 | 设置 YouTube 发布参数和时间，可选同发 X；向公众号写入草稿 |
+| 数据 | 查看 YouTube 频道数据、按需获取公开视频统计、查看调用记账 |
+
+## 数据源与发布通道
+
+| 通道 | 当前工作台用途 | 说明 |
 |---|---|---|
-| AIsa Social API (`/apis/v1/social`) | YouTube today; X, TikTok, Instagram, LinkedIn, Threads and more once connected | connect accounts, upload media, draft, schedule, publish, account health |
-| AIsa read APIs | X, YouTube, TikTok, Instagram, Xiaohongshu, WeChat articles | radar: public posts with link, publish time and engagement |
-| WeChat Official Account API | 公众号 | draft box only, through `self-media-wechat-publisher`; mass-send stays manual |
+| AIsa Social API（`/apis/v1/social`） | 账号连接、媒体上传、YouTube 发布与排期、可选同发 X、发布状态和账号健康 | 连接器提供的接口范围比工作台发布入口更广；实际可用性取决于账号与服务权限 |
+| AIsa 公开数据接口 | 雷达检索 X、YouTube、TikTok、Instagram、小红书和微信公众号文章 | 保存原始响应，并提取链接、发布时间及可获取的互动数据；不同平台字段并不相同 |
+| 微信公众号草稿通道 | 通过 `wenyan` 排版、上传图片并创建公众号草稿 | 需要安装 `wenyan`，并配置 `WECHAT_APP_ID`、`WECHAT_APP_SECRET`；群发仍由用户在公众号后台手动操作 |
 
-## Rules
+AIsa 是第三方 API 服务，详情见 [AIsa 官网](https://aisa.one)。公开指标、估算值和授权账号后台指标应分别理解，不应把热度值直接当作播放量。
 
-- `AISA_API_KEY` is read from the environment by the Node process only. It is never sent to the browser, written to the database or logged.
-- Nothing reaches a platform unless the content is `approved`. Approval is a human action (UI button or `content:review --approve`).
-- YouTube posts require an explicit `madeForKids` choice and a visibility. One active post per content and platform.
-- The same video can go to YouTube and X in one AIsa request. The X text lives in the content (`options.xText`), so it is reviewed with the video; links are refused because AIsa bills X posts with a URL at $0.20.
-- Every paid call carries `X-AISA-Max-Price-USD`; every AIsa call is logged in the `spend` table.
-- Radar is read-only, quoted first, and runs under a budget cap. Raw responses are kept under `data/radar/<time>/`.
-- Editing approved content sends it back to draft. WeChat output is redacted before it is stored.
-- The API refuses cross-origin writes and binds to 127.0.0.1.
+当前雷达由用户在网页或 CLI 中主动触发，不包含持续后台轮询、热点增长预警或消息推送。要持续追踪热点，需要额外添加定时采集和历史快照比较。
 
-## Known gaps (2026-11-09)
+## 技术结构
 
-- The data page shows 30-day channel analytics from `/analytics/youtube/channel-insights` (about $0.001 per call, 2 to 3 days of delay), follower stats, the channel video list and on-demand public view counts (`/youtube/videos`, about $0.014 each, cached locally).
-- Publish fees settle asynchronously and are not in the create-post response; check usage in the AIsa console.
-- Webhooks need a public HTTPS endpoint; this local build refreshes post status on demand.
+- 前端：原生 HTML、CSS、JavaScript，使用 URL hash 切换页面。
+- 后端：Node.js 内置 HTTP 服务，仅监听 `127.0.0.1`。
+- 数据库：Node.js 内置 SQLite，保存选题、内容、审核状态、发布记录、雷达记录和调用费用。
+- Web 和 CLI 共用 `server/ops.js` 中的业务规则。
+- 没有第三方 npm 运行依赖。
 
-## Run
+```text
+web/                  # 网页界面、样式和交互
+server/server.js      # 本地 HTTP API 与静态文件服务
+server/ops.js         # 内容、审核、发布和选题业务规则
+server/db.js          # SQLite 表结构与连接
+server/aisa.js        # AIsa 账号、媒体、发布与统计接口
+server/radar.js       # 雷达检索、预算控制、解析和归档
+server/cli.js         # 命令行入口
+test/ops.test.js      # 审核、发布和数据解析测试
+data/                 # 本地数据，已加入 Git 忽略规则
+```
 
-Requires Node 22.13 or later. No dependencies.
+## 启动方法
+
+### 1. 准备环境
+
+需要 **Node.js 22.13 或更高版本**。先检查版本：
 
 ```bash
+node --version
+```
+
+在启动 Node.js 的本机环境中配置 `AISA_API_KEY`。密钥由你自行从服务商获取，不要写进仓库、README、截图或提交记录。当前代码会在初始化连接器时检查密钥，未配置时整个服务会退出。
+
+微信公众号功能还需要 `wenyan` 和对应的公众号环境变量。只使用其他功能时，不必配置公众号凭据。
+
+### 2. 启动网页
+
+在仓库根目录执行：
+
+```bash
+cd apps/workbench
+npm start
+```
+
+浏览器访问 <http://127.0.0.1:4318>。可以使用 `PORT` 环境变量更换端口。
+
+### 3. 查看命令行帮助
+
+以下命令均在 `apps/workbench` 目录执行：
+
+```bash
+# 查看全部命令；此命令可在没有 AIsa Key 时运行
 npm run cli -- help
+
+# 列出已连接的账号（需要 AIsa Key）
 npm run cli -- accounts
+
+# 仅查询雷达检索报价
 npm run cli -- radar:quote --en "AI agent social media" --zh "AI 自媒体 工作流"
-npm start          # http://127.0.0.1:4318
+
+# 运行工作台单元测试，不需要真实账号或 API Key
 npm test
 ```
 
-Local data lives in `data/` (git-ignored).
+## 建议使用顺序
+
+1. 在“账号”中连接所需平台，确认账号状态。
+2. 在“雷达”中填写关键词，查看报价并确认扫描。
+3. 从检索结果选择证据，保存到“选题”。
+4. 为选定主题创建公众号文章或 YouTube 视频内容。
+5. 编辑标题、正文、素材路径，以及需要时的 X 文案，保存并送审。
+6. 在“审核”中检查内容，批准或写明原因退回。
+7. 在“排期”中确认目标账号和发布参数，再执行排期或写入公众号草稿箱。
+8. 手动刷新发布状态，在“数据”中查看结果与费用记录。
+
+公众号指**微信公众号**，不是微信视频号。公众号入口只创建草稿，不自动群发。
+
+## 审核、费用与凭据
+
+- 内容必须处于 `approved` 状态才能发布；审核操作来自界面按钮或明确的 CLI 审核命令。
+- YouTube 发布必须明确选择可见性，以及是否面向儿童（`madeForKids`）。
+- 视频可在一个 AIsa 请求中发往 YouTube 和 X。X 文案保存在 `options.xText` 中，随内容一起审核；当前实现拒绝包含链接的 X 文案，以避免触发不同的计费档位。
+- 发布创建和指定的付费统计请求携带 `X-AISA-Max-Price-USD` 价格上限；雷达逐次请求受剩余预算约束。实际收费和结算以服务商为准。
+- 连接器将返回的请求费用写入 `spend` 表；雷达完成后记录整次扫描费用。网络中断、异步结算等情况可能导致本地记录与服务商账单不同。
+- `AISA_API_KEY` 从后端进程环境读取，不发送给浏览器、不写入数据库或日志。微信公众号工具的输出经过脱敏后再保存摘要。
+- API 拒绝带有非本地允许来源 Origin 的写请求；这是本地应用，不是带用户登录与权限管理的公网服务。
+
+## 本地数据与备份
+
+默认数据库为 `data/workbench.db`，可以通过 `WORKBENCH_DB` 环境变量指定其他路径。雷达原始响应位于 `data/radar/<时间>/`，公众号中间 Markdown 位于 `data/wechat/`。
+
+`WORKBENCH_DB` 只改变数据库位置，不会自动改变雷达和公众号中间文件目录。备份时应覆盖完整 `data/` 目录；需要一致的数据库副本时，先停止服务再备份，或使用 SQLite 备份方式。
+
+## 当前限制
+
+- 工作台编辑器目前提供公众号文章和 YouTube 视频；其他平台的 Skills 流程不等于已有相应工作台界面。
+- 审核页展示视频文件路径和文案，尚未提供内嵌视频播放或素材哈希校验；批准后覆盖同一路径文件不会自动撤销审核。
+- 正常顺序操作会拦截已有活动发布记录，但并发请求尚无数据库级防重约束。
+- 连接器虽然提供删除远端帖子的函数，当前 HTTP API 和界面尚未接通取消排期流程。
+- 公开播放量按需获取并缓存；频道数据有同步延迟，不是所有指标都能实时获取。
+- 发布费用可能异步结算，不一定出现在创建帖子的响应中，请核对 AIsa 控制台。
+- Webhook 需要公网 HTTPS 接收地址，当前本地版本通过手动刷新获取发布状态。
+
+## 校验
+
+在工作台目录运行：
+
+```bash
+npm test
+```
+
+在仓库根目录运行整体 Skills 校验：
+
+```bash
+python3 scripts/validate.py
+```
+
+更多创作和发布规则见仓库根目录的 [中文 README](../../README.md) 和各个 [Skills](../../skills/)。
